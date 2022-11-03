@@ -2,22 +2,20 @@ import tensorflow as tf
 
 import tensorflow_probability as tfp
 
-from models import fmri_ae
-
-from utils import state_utils
+from eeg_to_fmri.models import fmri_ae
 
 from tensorflow.keras.layers import Dense#globals get attr
 
-from regularizers.activity_regularizers import InOfDistribution
+from eeg_to_fmri.regularizers.activity_regularizers import InOfDistribution
 
-from layers.fourier_features import RandomFourierFeatures, FourierFeatures, Sinusoids
-from layers.fft import padded_iDCT3D, DCT3D, variational_iDCT3D, iDCT3D
-from layers.topographical_attention import Topographical_Attention, Topographical_Attention_Scores_Regularization, Topographical_Attention_Reduction
-from layers.resnet_block import ResBlock, pretrained_ResBlock
-from layers.bayesian import DenseVariational
-from layers.mask import MRICircleMask
-from layers.latent_attention import Latent_EEG_Spatial_Attention, Latent_fMRI_Spatial_Attention
-from layers.style import Style
+from eeg_to_fmri.layers.fourier_features import RandomFourierFeatures, FourierFeatures, Sinusoids
+from eeg_to_fmri.layers.fft import padded_iDCT3D, DCT3D, variational_iDCT3D, iDCT3D
+from eeg_to_fmri.layers.topographical_attention import Topographical_Attention, Topographical_Attention_Scores_Regularization, Topographical_Attention_Reduction
+from eeg_to_fmri.layers.resnet_block import ResBlock, pretrained_ResBlock
+from eeg_to_fmri.layers.bayesian import DenseVariational
+from eeg_to_fmri.layers.mask import MRICircleMask
+from eeg_to_fmri.layers.latent_attention import Latent_EEG_Spatial_Attention, Latent_fMRI_Spatial_Attention
+from eeg_to_fmri.layers.style import Style
 
 from pathlib import Path
 import shutil
@@ -301,7 +299,8 @@ class EEG_to_fMRI(tf.keras.Model):
             x = tf.keras.layers.Conv3D(filters=1, kernel_size=1, strides=1,
                                     kernel_initializer=tf.keras.initializers.GlorotUniform(seed=seed))(x)
         elif(outfilter == 2):
-            x = LocallyConnected3D(filters=1, kernel_size=1, strides=1, implementation=3,
+            print("W: Outfiler 2 is deprecated, defaulting to outfilter=1")
+            x = tf.keras.layers.Conv3D(filters=1, kernel_size=1, strides=1,
                                     kernel_initializer=tf.keras.initializers.GlorotUniform(seed=seed))(x)
 
         output=x

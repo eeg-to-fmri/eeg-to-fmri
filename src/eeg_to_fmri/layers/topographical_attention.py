@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from regularizers.activity_regularizers import OrganizeChannels
+from eeg_to_fmri.regularizers.activity_regularizers import OrganizeChannels
 
 class Topographical_Attention_Scores_Regularization(tf.keras.layers.Layer):
 

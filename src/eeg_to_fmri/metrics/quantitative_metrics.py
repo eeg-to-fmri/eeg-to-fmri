@@ -6,9 +6,9 @@ import tensorflow_probability as tfp
 
 from scipy.stats import ttest_1samp
 
-from utils import bnn_utils
+from eeg_to_fmri.metrics import bnn
 
-from layers import fft
+from eeg_to_fmri.layers import fft
 
 
 """
@@ -29,7 +29,7 @@ def ssim(data, model, factor=3, two_inputs=True, variational=False, T=10):
 	for instance_x, instance_y in data.repeat(1):
 		if(two_inputs):
 			if(variational):
-				y_pred = bnn_utils.predict_MC(model, (instance_x, instance_y), T=T)
+				y_pred = bnn.predict_MC(model, (instance_x, instance_y), T=T)
 			else:
 				y_pred = model(instance_x, instance_y)
 		else:
@@ -75,7 +75,7 @@ def rmse(data, model, variational=False, T=10):
 
 	for instance_x, instance_y in data.repeat(1):
 		if(variational):
-			y_pred = bnn_utils.predict_MC(model, (instance_x, instance_y), T=T)
+			y_pred = bnn.predict_MC(model, (instance_x, instance_y), T=T)
 		else:
 			y_pred = model(instance_x, instance_y)
 
@@ -106,7 +106,7 @@ def residues(data, model, variational=False, T=10):
 
 	for instance_x, instance_y in data.repeat(1):
 		if(variational):
-			y_pred = bnn_utils.predict_MC(model, (instance_x, instance_y), T=T)
+			y_pred = bnn.predict_MC(model, (instance_x, instance_y), T=T)
 		else:
 			y_pred = model(instance_x, instance_y)
 

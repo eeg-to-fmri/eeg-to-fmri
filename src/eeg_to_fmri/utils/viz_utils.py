@@ -2,9 +2,11 @@ import tensorflow.compat.v1 as tf
 
 import numpy as np
 
-import utils.losses_utils as losses
+from eeg_to_fmri.metrics import bnn, quantitative_metrics
 
-from utils import bnn_utils, metrics, eeg_utils
+from eeg_to_fmri.learning import losses
+
+from eeg_to_fmri.data import eeg_utils
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -361,10 +363,10 @@ def plot_epistemic_aleatoric_uncertainty(setting, model, array_set, volume, xsli
     axes[0][1].imshow(rotate(model(array_set[volume:volume+1])[0].numpy()[0,xslice,:,:,:], 90, axes=(0,1)),cmap=plt.cm.nipy_spectral)
     axes[0][1].set_xticks([])
     axes[0][1].set_yticks([])
-    axes[0][2].imshow(rotate(bnn_utils.aleatoric_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,xslice,:,:,:], 90, axes=(0,1)))
+    axes[0][2].imshow(rotate(bnn.aleatoric_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,xslice,:,:,:], 90, axes=(0,1)))
     axes[0][2].set_xticks([])
     axes[0][2].set_yticks([])
-    axes[0][3].imshow(rotate(bnn_utils.epistemic_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,xslice,:,:,:], 90, axes=(0,1)))
+    axes[0][3].imshow(rotate(bnn.epistemic_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,xslice,:,:,:], 90, axes=(0,1)))
     axes[0][3].set_xticks([])
     axes[0][3].set_yticks([])
 
@@ -374,10 +376,10 @@ def plot_epistemic_aleatoric_uncertainty(setting, model, array_set, volume, xsli
     axes[1][1].imshow(rotate(model(array_set[volume:volume+1])[0].numpy()[0,:,yslice,:,:], 90, axes=(0,1)),cmap=plt.cm.nipy_spectral)
     axes[1][1].set_xticks([])
     axes[1][1].set_yticks([])
-    axes[1][2].imshow(rotate(bnn_utils.aleatoric_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,:,yslice,:,:], 90, axes=(0,1)))
+    axes[1][2].imshow(rotate(bnn.aleatoric_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,:,yslice,:,:], 90, axes=(0,1)))
     axes[1][2].set_xticks([])
     axes[1][2].set_yticks([])
-    axes[1][3].imshow(rotate(bnn_utils.epistemic_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,:,yslice,:,:], 90, axes=(0,1)))
+    axes[1][3].imshow(rotate(bnn.epistemic_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,:,yslice,:,:], 90, axes=(0,1)))
     axes[1][3].set_xticks([])
     axes[1][3].set_yticks([])
 
@@ -387,10 +389,10 @@ def plot_epistemic_aleatoric_uncertainty(setting, model, array_set, volume, xsli
     axes[2][1].imshow(model(array_set[volume:volume+1])[0].numpy()[0,:,:,zslice,:],cmap=plt.cm.nipy_spectral, aspect="auto")
     axes[2][1].set_xticks([])
     axes[2][1].set_yticks([])
-    axes[2][2].imshow(bnn_utils.aleatoric_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,:,:,zslice,:], aspect="auto")
+    axes[2][2].imshow(bnn.aleatoric_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,:,:,zslice,:], aspect="auto")
     axes[2][2].set_xticks([])
     axes[2][2].set_yticks([])
-    axes[2][3].imshow(bnn_utils.epistemic_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,:,:,zslice,:], aspect="auto")
+    axes[2][3].imshow(bnn.epistemic_uncertainty(model, array_set[volume:volume+1], T=T).numpy()[0,:,:,zslice,:], aspect="auto")
     axes[2][3].set_xticks([])
     axes[2][3].set_yticks([])
 
@@ -984,15 +986,15 @@ Examples:
 >>>
 >>> H=[2,5,7,10,13,15,18,20]
 >>> sinusoids_res = np.zeros((8,64,64,30,1))
->>> path_res = home+"/eeg_to_fmri/metrics/01_topographical_attention_random_fourier_features_attention_style_variational_VonMises_dependent_h_"
+>>> path_res = home+"/eeg_to_fmri/quantitative_metrics/01_topographical_attention_random_fourier_features_attention_style_variational_VonMises_dependent_h_"
 >>> for sin in range(len(H)):
->>>     sinusoids_res[sin] = np.mean(np.squeeze(np.load(path_res+str(H[sin])+"_30x30x15_res_2.0/metrics/res_seed_11.npy"), axis=1), axis=0)
+>>>     sinusoids_res[sin] = np.mean(np.squeeze(np.load(path_res+str(H[sin])+"_30x30x15_res_2.0/quantitative_metrics/res_seed_11.npy"), axis=1), axis=0)
 >>>
 >>> resolutions=["3x3x1","6x6x3","12x12x6","15x15x7","18x18x9","20x20x10","25x25x12","30x30x15"]
 >>> resolutions_res = np.zeros((8,64,64,30,1))
->>> path_res = home+"/eeg_to_fmri/metrics/01_topographical_attention_random_fourier_features_attention_style_variational_VonMises_dependent_h_15_"
+>>> path_res = home+"/eeg_to_fmri/quantitative_metrics/01_topographical_attention_random_fourier_features_attention_style_variational_VonMises_dependent_h_15_"
 >>> for res in range(len(resolutions)):
->>>     resolutions_res[res] = np.mean(np.squeeze(np.load(path_res+resolutions[res]+"_res_2.0/metrics/res_seed_11.npy"), axis=1), axis=0)
+>>>     resolutions_res[res] = np.mean(np.squeeze(np.load(path_res+resolutions[res]+"_res_2.0/quantitative_metrics/res_seed_11.npy"), axis=1), axis=0)
 >>>
 >>> viz_utils.plot_analysis_uncertainty(sinusoids_res, fmri_train, H, xlabel=r"$Var[res]$", ylabel=r"$H$", threshold=0.37, save=False, save_path=None, save_format="pdf")
 >>> viz_utils.plot_analysis_uncertainty(resolutions_res, fmri_train, resolutions, xlabel=r"$Var[res]$", ylabel=r"$R$", threshold=0.37, save=False, save_path=None, save_format="pdf")
@@ -1665,7 +1667,7 @@ Inputs:
 def R_analysis_times_freqs(R, times, freqs, func=np.std, save=False, save_path=None, save_format="pdf"):
     pop = (np.sum(R[:,:,:,:,0], axis=1),)
 
-    if(func is metrics.ttest_1samp_r):
+    if(func is quantitative_metrics.ttest_1samp_r):
         pop = pop+(np.mean(pop),)
     
     fig = plt.figure(figsize=(25,20))
@@ -1699,7 +1701,7 @@ Inputs:
 def R_analysis_channels_freqs(R, channels, freqs, func=np.std, ch_names=None, save=False, save_path=None, save_format="pdf"):
     pop = (np.sum(R[:,:,:,:,0], axis=3),)
 
-    if(func is metrics.ttest_1samp_r):
+    if(func is quantitative_metrics.ttest_1samp_r):
         pop = pop+(np.mean(pop),)
     
     if(ch_names is None):
@@ -1737,7 +1739,7 @@ Inputs:
 def R_analysis_times_channels(R, times, channels, func=np.std, ch_names=None, save=False, save_path=None, save_format="pdf"):
     pop = (np.sum(R[:,:,:,:,0], axis=2),)
     
-    if(func is metrics.ttest_1samp_r):
+    if(func is quantitative_metrics.ttest_1samp_r):
         pop = pop+(np.mean(pop),)
 
     if(ch_names is None):

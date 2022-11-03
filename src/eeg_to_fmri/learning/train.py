@@ -4,7 +4,7 @@ import gc
 
 import numpy as np
 
-from utils import print_utils
+from eeg_to_fmri.utils import print_utils
 
 def apply_gradient(model, optimizer, loss_fn, x, y, return_logits=False, call_fn=None):
     with tf.GradientTape(persistent=True) as tape:

@@ -1,4 +1,4 @@
-from utils import data_utils, eeg_utils, fmri_utils
+from eeg_to_fmri.data import data_utils, eeg_utils, fmri_utils
 
 import sys
 

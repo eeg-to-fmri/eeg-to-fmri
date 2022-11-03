@@ -4,10 +4,6 @@ import tensorflow_probability as tfp
 
 import numpy as np
 
-from layers import fourier_features #to import _get_default_scale
-
-
-
 
 
 class DCT3D(tf.keras.layers.Layer):

@@ -1,10 +1,6 @@
 import tensorflow as tf
 import numpy as np
 
-
-
-
-
 class Style(tf.keras.layers.Layer):
 	"""
 	Style Prior layer to save model

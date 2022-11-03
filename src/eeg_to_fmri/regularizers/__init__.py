@@ -1,0 +1,1 @@
+import eeg_to_fmri.regularizers.activity_regularizers

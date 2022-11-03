@@ -1,6 +1,4 @@
-from utils import eeg_utils
-from utils import fmri_utils
-from utils import outlier_utils
+from eeg_to_fmri.data import eeg_utils, fmri_utils, outlier_utils
 
 import numpy as np
 from numpy import correlate

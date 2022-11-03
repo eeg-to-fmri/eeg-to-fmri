@@ -2,9 +2,9 @@ import tensorflow as tf
 
 import tensorflow_probability as tfp
 
-from models.eeg_to_fmri import pretrained_EEG_to_fMRI
+from eeg_to_fmri.models.synthesizers import pretrained_EEG_to_fMRI
 
-from layers.bayesian import DenseVariational
+from eeg_to_fmri.layers.bayesian import DenseVariational
 
 class LinearClassifier(tf.keras.Model):
     """

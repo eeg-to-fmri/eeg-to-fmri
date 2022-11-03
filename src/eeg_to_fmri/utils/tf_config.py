@@ -8,8 +8,6 @@ import numpy as np
 
 import random
 
-from utils import memory_utils
-
 MAX_N_THREADS=0
 
 def setup_tensorflow(memory_limit, device="CPU", run_eagerly=False, set_primary_memory=False, set_tf_threads=False):
@@ -28,9 +26,6 @@ def setup_tensorflow(memory_limit, device="CPU", run_eagerly=False, set_primary_
 		tf.config.experimental.set_synchronous_execution(True)
 		tf.config.threading.set_inter_op_parallelism_threads(MAX_N_THREADS)
 		tf.config.threading.set_intra_op_parallelism_threads(MAX_N_THREADS)
-
-	if(set_primary_memory):
-		memory_utils.limit_CPU_memory(1024*1024*1024*24, 200)#16GB and max of 100 threads 
 
 def set_seed(seed=42):
 	random.seed(seed)

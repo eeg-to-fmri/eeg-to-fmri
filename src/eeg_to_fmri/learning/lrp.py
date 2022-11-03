@@ -2,7 +2,7 @@ import tensorflow as tf
 
 import numpy as np
 
-from layers.topographical_attention import Topographical_Attention
+from eeg_to_fmri.layers.topographical_attention import Topographical_Attention
 
 
 def explain(explainer, dataset, eeg=True, eeg_attention=False, fmri=False, verbose=False):

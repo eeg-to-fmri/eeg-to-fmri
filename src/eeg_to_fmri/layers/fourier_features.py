@@ -2,8 +2,6 @@ import tensorflow as tf
 
 import numpy as np
 
-from regularizers.activity_regularizers import InOfDistribution
-
 _SUPPORTED_RBF_KERNEL_TYPES = ['gaussian']
 
 def _get_default_scale(initializer, input_dim):

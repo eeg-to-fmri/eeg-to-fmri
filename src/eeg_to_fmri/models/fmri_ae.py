@@ -1,8 +1,7 @@
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from layers.locally_connected import LocallyConnected3D
-from layers.resnet_block import ResBlock
+from eeg_to_fmri.layers.resnet_block import ResBlock
 
 search_space = [{'name': 'learning_rate', 'type': 'continuous',
                     'domain': (1e-5, 1e-2)},
@@ -104,7 +103,8 @@ class fMRI_AE(tf.keras.Model):
         if(local):
             operation=tf.keras.layers.Conv3D
         else:
-            operation=LocallyConnected3D
+            print("W: non local option is deprecated, defaulting to standard convolution")
+            operation=tf.keras.layers.Conv3D
 
         x = tf.keras.layers.Flatten()(x)
         x = tf.keras.layers.Dense(self.latent_shape[0]*self.latent_shape[1]*self.latent_shape[2], 
@@ -135,7 +135,8 @@ class fMRI_AE(tf.keras.Model):
             x = tf.keras.layers.Conv3D(filters=1, kernel_size=1, strides=1,
                                     kernel_initializer=tf.keras.initializers.GlorotUniform(seed=seed))(x)
         elif(outfilter == 2):
-            x = LocallyConnected3D(filters=1, kernel_size=1, strides=1, implementation=3,
+            print("W: Outfiler 2 is deprecated, defaulting to outfilter=1")
+            x = tf.keras.layers.Conv3D(filters=1, kernel_size=1, strides=1,
                                     kernel_initializer=tf.keras.initializers.GlorotUniform(seed=seed))(x)
 
         self.decoder = tf.keras.Model(input_shape, x)    
@@ -221,7 +222,8 @@ class BNN_fMRI_AE(tf.keras.Model):
         if(local):
             operation=tfp.layers.Convolution3DFlipout
         else:
-            operation=LocallyConnected3D
+            print("W: non local option is deprecated, defaulting to standard convolution")
+            operation=tfp.layers.Convolution3DFlipout
 
         x = block(x, operation, (7,7,7), stride_size, n_channels,
                 maxpool=maxpool, batch_norm=batch_norm, weight_decay=weight_decay, seed=seed)
@@ -251,7 +253,8 @@ class BNN_fMRI_AE(tf.keras.Model):
             x = tf.keras.layers.Conv3D(filters=1, kernel_size=1, strides=1,
                                     kernel_initializer=tf.keras.initializers.GlorotUniform(seed=seed))(x)
         elif(outfilter == 2):
-            x = LocallyConnected3D(filters=1, kernel_size=1, strides=1, implementation=3,
+            print("W: Outfiler 2 is deprecated, defaulting to outfilter=1")
+            x = tf.keras.layers.Conv3D(filters=1, kernel_size=1, strides=1,
                                     kernel_initializer=tf.keras.initializers.GlorotUniform(seed=seed))(x)
         
 

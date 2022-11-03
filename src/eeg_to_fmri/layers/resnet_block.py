@@ -1,10 +1,6 @@
 import tensorflow as tf
 
-import sys
-
-sys.path.append("..")
-
-from utils import lrp
+from eeg_to_fmri.learning import lrp
 
 """
 Resnet-18 block that has implemented 
