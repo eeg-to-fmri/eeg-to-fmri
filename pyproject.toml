@@ -1,6 +1,6 @@
 [project]
 name = "eeg-to-fmri"
-version = "0.0.2"
+version = "0.0.3"
 readme = "README.md"
 authors = [{ name = "David Calhas", email = "eeg_to_fmri@outlook.com" }]
 license = { file = "LICENSE" }
