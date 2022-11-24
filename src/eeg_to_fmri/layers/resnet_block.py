@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from eeg_to_fmri.learning import lrp
+from eeg_to_fmri.explainability import lrp
 
 """
 Resnet-18 block that has implemented 
