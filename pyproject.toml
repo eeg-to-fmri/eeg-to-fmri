@@ -1,6 +1,6 @@
 [project]
 name = "eeg-to-fmri"
-version = "0.0.3"
+version = "0.0.4"
 readme = "README.md"
 authors = [{ name = "David Calhas", email = "eeg_to_fmri@outlook.com" }]
 license = { file = "LICENSE" }
@@ -17,6 +17,8 @@ dependencies = [
 	"mne==0.23.4",
 	"nilearn==0.7.0",
 	"tensorflow_probability==0.12.2",
+	"tensorflow-determinism==0.3.0",
+	"tensorflow-addons==0.19.0",
 	"jax==0.2.12",
 	"jaxlib==0.1.64"
 ]
