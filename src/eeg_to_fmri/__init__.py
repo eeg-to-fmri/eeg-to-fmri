@@ -1,7 +1,7 @@
 
 
 
-__version__="0.0.1"
+__version__="0.0.3"
 
 import eeg_to_fmri.models
 import eeg_to_fmri.layers
