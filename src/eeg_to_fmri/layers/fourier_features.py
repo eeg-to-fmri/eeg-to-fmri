@@ -2,6 +2,8 @@ import tensorflow as tf
 
 import numpy as np
 
+from eeg_to_fmri.regularizers.activity_regularizers import InOfDistribution, MaxBatchNorm
+
 _SUPPORTED_RBF_KERNEL_TYPES = ['gaussian']
 
 def _get_default_scale(initializer, input_dim):
@@ -32,6 +34,21 @@ def _get_random_features_initializer(initializer, shape, seed=None):
 							random_features_initializer, _SUPPORTED_RBF_KERNEL_TYPES))
 	return random_features_initializer
 
+
+class MaxNormalization(tf.keras.layers.Layer):
+
+	def __init__(self, mu=0, l=0.01, p=1., **kwargs):
+		
+		super(MaxNormalization, self).__init__(activity_regularizer=MaxBatchNorm(mu=mu, l=l, p=p), **kwargs)
+		
+	def get_config(self):
+		return {}
+
+	@classmethod
+	def from_config(cls, config):
+		return cls(**config)
+
+
 class Sinusoids(tf.keras.layers.Layer):
 
 
@@ -49,10 +66,25 @@ class Sinusoids(tf.keras.layers.Layer):
 	def from_config(cls, config):
 		return cls(**config)
 
+class TanhNormalization(tf.keras.layers.Layer):
+
+	def __init__(self, **kwargs):
+
+		super(TanhNormalization, self).__init__(**kwargs)
+
+	def call(self, X):
+		return tf.keras.activations.tanh(X)*(np.pi/2)+(np.pi/2)
+
+	def get_config(self):
+		return {}
+
+	@classmethod
+	def from_config(cls, config):
+		return cls(**config)
 
 class RandomFourierFeatures(tf.keras.layers.Layer):
 
-	def __init__(self, output_dim, kernel_initializer='gaussian', scale=None, trainable=False, units=None, seed=None, name=None, **kwargs):
+	def __init__(self, output_dim, kernel_initializer='gaussian', scale=None, normalization="layer", trainable=False, units=None, seed=None, name=None, **kwargs):
 		if output_dim <= 0:
 			raise ValueError(
 			'`output_dim` should be a positive integer. Given: {}.'.format(
@@ -68,8 +100,14 @@ class RandomFourierFeatures(tf.keras.layers.Layer):
 		super(RandomFourierFeatures, self).__init__(name=name)
 		self.output_dim = output_dim
 		self.units=output_dim
+		self.normalization=normalization
 		self.kernel_initializer = kernel_initializer
-		self.layer_normalization=tf.keras.layers.LayerNormalization(beta_initializer=tf.constant_initializer(np.pi/2), gamma_initializer=tf.constant_initializer(np.pi/2), trainable=False)
+		if(normalization=="layer"):
+			self.layer_normalization=tf.keras.layers.LayerNormalization(beta_initializer=tf.constant_initializer(np.pi/2), gamma_initializer=tf.constant_initializer(np.pi/2), trainable=False)
+			self.reg_normalization=MaxNormalization(mu=np.pi/2, l=0.5*(2/np.pi)**0.5, p=2)
+		elif(normalization=="tanh"):
+			self.layer_normalization=TanhNormalization()
+			self.reg_normalization=MaxNormalization(mu=np.pi/2, l=0.5*(2/np.pi)**0.5, p=2)
 		self.scale = scale
 		self.seed=seed
 		self.trainable=trainable
@@ -116,6 +154,8 @@ class RandomFourierFeatures(tf.keras.layers.Layer):
 		outputs = tf.nn.bias_add(outputs, self.bias)
 		
 		outputs=self.layer_normalization(outputs)
+
+		outputs=self.reg_normalization(outputs)
 		
 		return outputs
 
@@ -137,6 +177,7 @@ class RandomFourierFeatures(tf.keras.layers.Layer):
 			'kernel_initializer': kernel_initializer,
 			'scale': self.scale,
 			'units': self.units,
+			'normalization': self.normalization,
 		}
 		base_config = super(RandomFourierFeatures, self).get_config()
 		return dict(list(base_config.items()) + list(config.items()))

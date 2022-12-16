@@ -27,9 +27,9 @@ def setup_tensorflow(memory_limit, device="CPU", run_eagerly=False, set_primary_
 		tf.config.threading.set_inter_op_parallelism_threads(MAX_N_THREADS)
 		tf.config.threading.set_intra_op_parallelism_threads(MAX_N_THREADS)
 
-def set_seed(seed=42):
+def set_seed(seed=42, enable_gpu_determinism=False):
 	random.seed(seed)
 	np.random.seed(seed)
 	tf.random.set_seed(seed)
-	tf.config.experimental.enable_op_determinism()
-	os.environ['TF_DETERMINISTIC_OPS'] = '1'
+	if(enable_gpu_determinism):
+		tf.config.experimental.enable_op_determinism()

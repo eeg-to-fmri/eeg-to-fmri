@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import correlate
 
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 
 import tensorflow.keras.backend as K
 
@@ -25,11 +25,34 @@ def separate_targets(y):
     else:
         return y,y,y
 
-    
+
+class ClassificationLoss(tf.keras.losses.Loss):
+
+    def __init__(self, from_logits=False, reduction='auto', **kwargs):
+
+        super(ClassificationLoss, self).__init__(reduction='none', **kwargs)
+
+        self.from_logits=from_logits
+        self._loss_fn=tf.keras.losses.MeanSquaredError(reduction=reduction)
+
+    def call(self, y_true, y_pred):
+        if(self.from_logits):
+            y_pred=tf.keras.activations.sigmoid(y_pred)
+        return self._loss_fn(y_true, y_pred)
+
+class SeparationEntropyLoss(tf.keras.losses.Loss):
+
+    def __init__(self, reduction='auto', **kwargs):
+        super(SeparationEntropyLoss, self).__init__(**kwargs)
+        self.nll=tf.keras.losses.BinaryCrossentropy(from_logits=True, reduction=tf.keras.losses.Reduction.NONE)
+
+    def call(self, y_true, y_pred):
+        return self.nll(tf.repeat(tf.expand_dims(y_true, axis=-1), repeats=y_pred[0].shape[-1], axis=-1), y_pred[0])+self.nll(y_true, y_pred[1])
+
 
 class ContrastiveLoss(tf.keras.losses.Loss):
 
-    def __init__(self, m=0.5, **kwargs):
+    def __init__(self, m=np.pi, **kwargs):
 
         super(ContrastiveLoss, self).__init__(**kwargs)
 
@@ -44,7 +67,8 @@ class ContrastiveLoss(tf.keras.losses.Loss):
         if(tf.rank(distance)==2):
             similar=tf.expand_dims(similar, axis=-1)
 
-        return similar*distance + (1-similar)*(tf.abs(distance-self.m))
+        return tf.math.log(similar*distance + (1-similar)*(tf.abs(distance-self.m)))#go to minus infinity
+        return similar*(-1.*distance) + (1-similar)*(1.*distance)
 
 
 class ContrastiveClassificationLoss(tf.keras.losses.Loss):
@@ -53,22 +77,25 @@ class ContrastiveClassificationLoss(tf.keras.losses.Loss):
 
         super(ContrastiveClassificationLoss, self).__init__(**kwargs)
 
-        self.contrastive=ContrastiveLoss(m=m, reduction=reduction)
-        self.nll=tf.keras.losses.BinaryCrossentropy(from_logits=True, reduction=reduction)
+        self.contrastive=ContrastiveLoss(m=m, reduction=tf.keras.losses.Reduction.NONE)
+        self.nll=tf.keras.losses.BinaryCrossentropy(from_logits=True, reduction=tf.keras.losses.Reduction.NONE)
 
-    def call(self, y_true, y_pred):
+    def call(self, y_true, y_pred, y1_var=1., y2_var=1.):
         y_contrast,y_clf1,y_clf2 = separate_targets(y_true)
 
-        if(len(y_pred)>3):
+        if(tf.shape(y_pred[2])[-1]==2 and tf.rank(y_pred[2])==3):
             """
-            Means that there are some latent contrastive losses to be induced
+            Means we are running uncertainty
             """
-            return self.contrastive(y_contrast, y_pred[0])+self.call(y_true, y_pred[1:])
+            y1_pred, y1_var = tf.split(y_pred[2], 2, axis=-1)
+            y2_pred, y2_var = tf.split(y_pred[3], 2, axis=-1)
+            y1_pred, y1_var, y2_pred, y2_var = (tf.squeeze(y1_pred, axis=-1), tf.squeeze(y1_var, axis=-1), tf.squeeze(y2_pred, axis=-1), tf.squeeze(y2_var, axis=-1))
+        else:
+            y1_pred, y1_var = (y_pred[2], 1.)
+            y2_pred, y2_var = (y_pred[3], 1.)
 
-        return self.contrastive(y_contrast, y_pred[0])+self.nll(y_clf1[:,1], y_pred[1])+self.nll(y_clf2[:,1], y_pred[2])
-        
-
-
+        #return self.contrastive(y_contrast, y_pred[1])+0.*(1/y1_var)*self.nll(tf.expand_dims(y_clf1[:,1],-1), y1_pred)+0.*(1/y2_var)*self.nll(tf.expand_dims(y_clf2[:,1],-1), y2_pred) + tf.math.log(y1_var*y2_var)
+        return tf.reduce_mean(self.contrastive(y_contrast, y_pred[1]),axis=1)+(1/y1_var)*self.nll(tf.expand_dims(y_clf1[:,1],-1), y1_pred)+(1/y2_var)*self.nll(tf.expand_dims(y_clf2[:,1],-1), y2_pred) + tf.math.log(y1_var*y2_var)
 
 ######################################################################################################################
 #

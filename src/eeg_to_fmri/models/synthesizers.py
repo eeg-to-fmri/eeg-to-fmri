@@ -6,9 +6,9 @@ from eeg_to_fmri.models import fmri_ae
 
 from tensorflow.keras.layers import Dense#globals get attr
 
-from eeg_to_fmri.regularizers.activity_regularizers import InOfDistribution
+from eeg_to_fmri.regularizers.activity_regularizers import InOfDistribution, MaxBatchNorm
 
-from eeg_to_fmri.layers.fourier_features import RandomFourierFeatures, FourierFeatures, Sinusoids
+from eeg_to_fmri.layers.fourier_features import RandomFourierFeatures, FourierFeatures, Sinusoids, MaxNormalization
 from eeg_to_fmri.layers.fft import padded_iDCT3D, DCT3D, variational_iDCT3D, iDCT3D
 from eeg_to_fmri.layers.topographical_attention import Topographical_Attention, Topographical_Attention_Scores_Regularization, Topographical_Attention_Reduction
 from eeg_to_fmri.layers.resnet_block import ResBlock, pretrained_ResBlock
@@ -23,6 +23,8 @@ import os
 import pickle
 
 parameters=(0.002980911194116198, 0.0, (9, 9, 4), (1, 1, 1), 4, (7, 7, 7), 4, True, True, True, True, 3, 1, True)
+
+na_specification_eeg=([(7, 37, 2), (7, 7, 2)], [(3, 5, 1), (2, 2, 1)], True, (2, 2, 1), (1, 1, 1))
 
 search_space = [{'name': 'learning_rate', 'type': 'continuous',
 					'domain': (1e-5, 1e-2)},
@@ -105,7 +107,7 @@ class EEG_to_fMRI(tf.keras.Model):
                 inverse_DFT=False, DFT=False, aleatoric_uncertainty=False,
                 variational_iDFT=False, variational_coefs=None, variational_dist=None,
                 variational_iDFT_dependent=False, variational_iDFT_dependent_dim=1,
-                variational_random_padding=False,
+                variational_random_padding=False, fourier_normalization="layer",
                 resolution_decoder=None, low_resolution_decoder=False,
                 topographical_attention=False, organize_channels=False,
                  seed=None, fmri_args=None):
@@ -125,6 +127,7 @@ class EEG_to_fMRI(tf.keras.Model):
         self.conditional_attention_style=conditional_attention_style
         self.conditional_attention_style_prior=conditional_attention_style_prior
         self.random_fourier=random_fourier
+        self.fourier_normalization=fourier_normalization
         self.inverse_DFT=inverse_DFT
         self.DFT=DFT
         self.variational_iDFT=variational_iDFT
@@ -140,13 +143,16 @@ class EEG_to_fMRI(tf.keras.Model):
         self.aleatoric_uncertainty=aleatoric_uncertainty
         self.seed=seed
         self.fmri_args=fmri_args
+
+        if(self.na_spec is None):
+            self.na_spec=na_specification_eeg
         
         if(len(fmri_args)==17):#needs to be update if 
             self.fmri_ae = fmri_ae.fMRI_AE(*fmri_args)
         else:
             raise NotImplementedError
 
-        input_shape, x, attention_scores = self.build_encoder(latent_shape, input_shape, na_spec, n_channels, 
+        input_shape, x, attention_scores = self.build_encoder(latent_shape, input_shape, self.na_spec, n_channels, 
                             dropout=dropout, weight_decay=weight_decay, 
                             skip_connections=skip_connections, local=local, 
                             batch_norm=batch_norm, 
@@ -161,6 +167,7 @@ class EEG_to_fMRI(tf.keras.Model):
                             fourier_features=fourier_features,
                             resolution_decoder=resolution_decoder,
                             low_resolution_decoder=low_resolution_decoder,
+                            fourier_normalization=fourier_normalization,
                             variational_iDFT=variational_iDFT, 
                             variational_coefs=variational_coefs,
                             variational_iDFT_dependent=variational_iDFT_dependent,
@@ -187,9 +194,6 @@ class EEG_to_fMRI(tf.keras.Model):
             x, attention_scores = Topographical_Attention(self._input_shape[0], self._input_shape[1]*self._input_shape[2])(x)
             if(organize_channels):
                 attention_scores = Topographical_Attention_Scores_Regularization()(attention_scores)
-            #x = Topographical_Attention_Reduction()(x, attention_scores)
-            #x, attention_scores = Topographical_Attif(organize_channels):
-            #reshape back to original shape
             x = tf.keras.layers.Reshape(self._input_shape)(x)
             previous_block_x = x
         else:
@@ -215,7 +219,7 @@ class EEG_to_fMRI(tf.keras.Model):
 
     def build_decoder(self, input_shape, output_encoder, latent_shape, fourier_features=False, random_fourier=False, 
                             attention_scores=None, conditional_attention_style=False, conditional_attention_style_prior=False,
-                            inverse_DFT=False, DFT=False, 
+                            inverse_DFT=False, DFT=False, fourier_normalization="layer",
                             low_resolution_decoder=False, resolution_decoder=None, 
                             variational_iDFT=False, variational_coefs=None, variational_dist=None,
                             variational_iDFT_dependent=False, variational_iDFT_dependent_dim=1,
@@ -227,7 +231,7 @@ class EEG_to_fMRI(tf.keras.Model):
         if(fourier_features):
             if(random_fourier):
                 x = RandomFourierFeatures(latent_shape[0]*latent_shape[1]*latent_shape[2],
-                                                                trainable=True, seed=seed, name="random_fourier_features")(x)
+                                                                normalization=fourier_normalization, trainable=True, seed=seed, name="random_fourier_features")(x)
             else:
                 x = FourierFeatures(latent_shape[0]*latent_shape[1]*latent_shape[2], 
                                                                     trainable=True, name="fourier_features")(x)
@@ -311,7 +315,7 @@ class EEG_to_fMRI(tf.keras.Model):
 
     def build(self, input_shape1, input_shape2):
         self.eeg_encoder.build(input_shape=input_shape1)
-        self.decoder.build(input_shape=self.eeg_encoder.output_shape)
+        self.decoder.build(input_shape=input_shape1)
 
         self.fmri_encoder.build(input_shape=input_shape2)
 
@@ -353,6 +357,7 @@ class EEG_to_fMRI(tf.keras.Model):
                 "dropout": self.dropout,
                 "local": self.local,
                 "fourier_features": self.fourier_features,
+                "fourier_normalization": self.fourier_normalization,
                 "conditional_attention_style": self.conditional_attention_style,
                 "conditional_attention_style_prior": self.conditional_attention_style_prior,
                 "random_fourier": self.random_fourier,
@@ -390,6 +395,8 @@ custom_objects={"Topographical_Attention": Topographical_Attention,
                 "Latent_fMRI_Spatial_Attention": Latent_fMRI_Spatial_Attention,
                 "DenseVariational": DenseVariational,
                 "InOfDistribution": InOfDistribution,
+                "MaxNormalization": MaxNormalization,
+                "MaxBatchNorm": MaxBatchNorm,
                 "Sinusoids": Sinusoids,}
 
 
@@ -431,13 +438,6 @@ class pretrained_EEG_to_fMRI(tf.keras.Model):
         input_shape = tf.keras.layers.Input(shape=self._input_shape)
 
         x = input_shape
-        #reshape to flattened features to apply attention mechanism
-        x = tf.keras.layers.Reshape((self._input_shape[0], self._input_shape[1]*self._input_shape[2]))(x)
-        #topographical attention
-        x, attention_scores = Topographical_Attention(self._input_shape[0], self._input_shape[1]*self._input_shape[2], regularizer=regularizer)(x)
-        if(organize_channels):
-            raise NotImplementedError
-            attention_scores = Topographical_Attention_Scores_Regularization()(attention_scores)
 
         #reshape back to original shape
         x = tf.keras.layers.Reshape(self._input_shape)(x)
@@ -472,23 +472,28 @@ class pretrained_EEG_to_fMRI(tf.keras.Model):
                                 bias_initializer=tf.keras.initializers.GlorotUniform(seed=seed),#tf.constant_initializer(pretrained_model.layers[1].layers[-2].bias.numpy()),
                                 trainable=True)(x)#placeholder
         
-        x = tf.keras.layers.Reshape(pretrained_model.layers[1].layers[-1].target_shape)(x)
-
-        x = tf.keras.layers.Flatten()(x)
-
-        if("Fourier" in type(pretrained_model.layers[3].layers[10]).__name__):
+        if("Fourier" in type(pretrained_model.layers[3]).__name__):
+            self.index_model=4
+            if("Fourier" in type(pretrained_model.layers[self.index_model].layers[10]).__name__):
+                index=10
+        elif("Fourier" in type(pretrained_model.layers[3].layers[10]).__name__):
+            self.index_model=3
+            index=10
+        elif("Dense" in type(pretrained_model.layers[3].layers[10]).__name__):
+            self.index_model=3
             index=10
         else:
             raise NotImplementedError
 
-        if("Fourier" in type(pretrained_model.layers[3].layers[index]).__name__):
-            x = globals()[type(pretrained_model.layers[3].layers[index]).__name__](
-                                            pretrained_model.layers[3].layers[index].units,
-                                            scale=pretrained_model.layers[3].layers[index].kernel_scale.numpy(),
+        if("Fourier" in type(pretrained_model.layers[self.index_model].layers[index]).__name__):
+            x = globals()[type(pretrained_model.layers[self.index_model].layers[index]).__name__](
+                                            pretrained_model.layers[self.index_model].layers[index].units,
+                                            normalization=pretrained_model.layers[self.index_model].layers[index].normalization,
+                                            scale=pretrained_model.layers[self.index_model].layers[index].kernel_scale.numpy(),
                                             trainable=False, name="latent_projection")(x)
         else:
-            x = globals()[type(pretrained_model.layers[3].layers[index]).__name__](
-                                                pretrained_model.layers[3].layers[index].units,
+            x = globals()[type(pretrained_model.layers[self.index_model].layers[index]).__name__](
+                                                pretrained_model.layers[self.index_model].layers[index].units,
                                                 kernel_regularizer=regularizer,
                                                 bias_regularizer=regularizer,
                                                 trainable=False, name="latent_projection")(x)
@@ -500,103 +505,96 @@ class pretrained_EEG_to_fMRI(tf.keras.Model):
     def build_decoder(self, pretrained_model, input_shape, output_encoder, activation=None, attention_scores=None, regularizer=None, feature_selection=False, segmentation_mask=False, seed=None):
         x = output_encoder
         
-        if("Fourier" in type(pretrained_model.layers[3].layers[10]).__name__):
+        if("Fourier" in type(pretrained_model.layers[self.index_model].layers[10]).__name__):
             index=11
-        elif("Dense" in type(pretrained_model.layers[3].layers[10]).__name__):
-            index=10
+        elif("Dense" in type(pretrained_model.layers[self.index_model].layers[10]).__name__):
+            index=11
         else:
             raise NotImplementedError
 
-        #project sinusoids
-        if("Sinusoids" in type(pretrained_model.layers[3].layers[index]).__name__):
+                #project sinusoids
+        if("Sinusoids" in type(pretrained_model.layers[self.index_model].layers[index]).__name__):
             x=Sinusoids()(x)
+            index+=1
         
-        index+=1
-        
-        if(pretrained_model.layers[3].layers[index].name=="conditional_attention_style_dense"):
+        if(pretrained_model.layers[self.index_model].layers[index].name=="conditional_attention_style_dense"):
             attention_scores = tf.keras.layers.Flatten(name="conditional_attention_style_flatten")(attention_scores)
-            self.latent_style = getattr(tf.keras.layers, type(pretrained_model.layers[3].layers[index]).__name__)(
-                                        pretrained_model.layers[3].layers[index].units,
+            self.latent_style = getattr(tf.keras.layers, type(pretrained_model.layers[self.index_model].layers[index]).__name__)(
+                                        pretrained_model.layers[self.index_model].layers[index].units,
                                         activation=tf.keras.activations.linear,
                                         kernel_regularizer=regularizer,
                                         bias_regularizer=regularizer,
-                                        use_bias=pretrained_model.layers[3].layers[index].use_bias,
+                                        use_bias=pretrained_model.layers[self.index_model].layers[index].use_bias,
                                         name="conditional_attention_style_dense",
                                         kernel_initializer=tf.keras.initializers.GlorotUniform(seed=seed),
                                         trainable=False)(attention_scores)
             #add style features from attention graph or prior learned style
             x = x*self.latent_style
-        elif(pretrained_model.layers[3].layers[index].name=="style_prior"):
-            x = Style(initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].latent_style.numpy()), trainable=False, seed=None, name='style_prior')(x)
-        else:
-            raise NotImplementedError
+        elif(pretrained_model.layers[self.index_model].layers[index].name=="style_prior"):
+            x = Style(initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].latent_style.numpy()), trainable=False, seed=None, name='style_prior')(x)
 
-        index+=1        
+        index+=1
         
-        x = getattr(tf.keras.layers, type(pretrained_model.layers[3].layers[index]).__name__)(
-                    pretrained_model.layers[3].layers[index].target_shape)(x)
+        x = getattr(tf.keras.layers, type(pretrained_model.layers[self.index_model].layers[index]).__name__)(
+                    pretrained_model.layers[self.index_model].layers[index].target_shape)(x)
         index+=1
 
-        x = getattr(tf.keras.layers, type(pretrained_model.layers[3].layers[index]).__name__)()(x)
+        x = getattr(tf.keras.layers, type(pretrained_model.layers[self.index_model].layers[index]).__name__)()(x)
         index+=1
 
         #upsampling layer
-        if(type(pretrained_model.layers[3].layers[index]).__name__=="Dense"):
-            x = getattr(tf.keras.layers, type(pretrained_model.layers[3].layers[index]).__name__)(
-                    pretrained_model.layers[3].layers[index].units,
+        if(type(pretrained_model.layers[self.index_model].layers[index]).__name__=="Dense"):
+            x = getattr(tf.keras.layers, type(pretrained_model.layers[self.index_model].layers[index]).__name__)(
+                    pretrained_model.layers[self.index_model].layers[index].units,
                     activation=tf.keras.activations.linear,
-                    kernel_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].kernel.numpy()),
-                    bias_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].bias.numpy()),
+                    kernel_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].kernel.numpy()),
+                    bias_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].bias.numpy()),
                     kernel_regularizer=regularizer,
                     bias_regularizer=regularizer,
                     trainable=False)(x)
-        elif(type(pretrained_model.layers[3].layers[index]).__name__=="DenseVariational"):
-            x = DenseVariational(pretrained_model.layers[3].layers[index].units,
-                                activation=tf.keras.activations.linear,
-                                kernel_prior_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].kernel_mu.numpy()),
-                                kernel_posterior_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].kernel_sigma.numpy()),
-                                bias_prior_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].bias_mu.numpy()),
-                                bias_posterior_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].bias_sigma.numpy()),
+        elif(type(pretrained_model.layers[self.index_model].layers[index]).__name__=="DenseVariational"):
+            x = DenseVariational(pretrained_model.layers[self.index_model].layers[index].units,
+                                activation=pretrained_model.layers[self.index_model].layers[index].activation_fn,
+                                kernel_prior_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].kernel_mu.numpy()),
+                                kernel_posterior_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].kernel_sigma.numpy()),
+                                bias_prior_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].bias_mu.numpy()),
+                                bias_posterior_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].bias_sigma.numpy()),
                                 trainable=False)(x)
-
-            raise NotImplementedError
         else:
             raise NotImplementedError
         
         index+=1
 
-        self.aleatoric=False
-        if(type(pretrained_model.layers[3].layers[index+1]).__name__=="DCT3D"):
+        if(type(pretrained_model.layers[self.index_model].layers[index+1]).__name__=="DCT3D"):
             #reshape
-            x = getattr(tf.keras.layers, type(pretrained_model.layers[3].layers[index]).__name__)(
-                        pretrained_model.layers[3].layers[index].target_shape)(x)
+            x = getattr(tf.keras.layers, type(pretrained_model.layers[self.index_model].layers[index]).__name__)(
+                        pretrained_model.layers[self.index_model].layers[index].target_shape)(x)
             index+=1
 
             #initialize DCT3D layer
-            x = DCT3D(**pretrained_model.layers[3].layers[index].get_config())(x)
+            x = DCT3D(**pretrained_model.layers[self.index_model].layers[index].get_config())(x)
             #remove this
             index+=1
 
-            if(type(pretrained_model.layers[3].layers[index]).__name__=="variational_iDCT3D"):
-                x = variational_iDCT3D(**pretrained_model.layers[3].layers[index].get_config(), 
-                                        normal_loc_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].normal.distribution.loc.numpy()),
-                                        normal_scale_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].normal.distribution.scale.numpy()),
-                                        w1_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].w1.numpy()),
-                                        w2_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].w2.numpy()),
-                                        w3_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].w3.numpy()),
-                                        loc_posterior_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].loc.numpy()),
-                                        scale_posterior_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].scale.numpy()),
-                                        biases_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].biases.numpy()),
-                                        trainable=True)(x)
-                self.aleatoric=True
-            elif(type(pretrained_model.layers[3].layers[index]).__name__=="padded_iDCT3D"):
-                x = padded_iDCT3D(**pretrained_model.layers[3].layers[index].get_config())(x)
+            if(type(pretrained_model.layers[self.index_model].layers[index]).__name__=="variational_iDCT3D"):
+                x = variational_iDCT3D(**pretrained_model.layers[self.index_model].layers[index].get_config(), 
+                                        normal_loc_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].normal.distribution.loc.numpy()),
+                                        normal_scale_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].normal.distribution.scale.numpy()),
+                                        w1_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].w1.numpy()),
+                                        w2_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].w2.numpy()),
+                                        w3_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].w3.numpy()),
+                                        loc_posterior_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].loc.numpy()),
+                                        scale_posterior_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].scale.numpy()),
+                                        biases_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].biases.numpy()),
+                                        trainable=False)(x)
+            elif(type(pretrained_model.layers[self.index_model].layers[index]).__name__=="padded_iDCT3D"):
+                x = padded_iDCT3D(**pretrained_model.layers[self.index_model].layers[index].get_config())(x)
             index+=1
 
 
 
-        x = getattr(tf.keras.layers, type(pretrained_model.layers[3].layers[index]).__name__)(
-            pretrained_model.layers[3].layers[index].target_shape)(x)
+        x = getattr(tf.keras.layers, type(pretrained_model.layers[self.index_model].layers[index]).__name__)(
+            pretrained_model.layers[self.index_model].layers[index].target_shape)(x)
 
         #feature selection occurs here
         z = None
@@ -605,76 +603,31 @@ class pretrained_EEG_to_fMRI(tf.keras.Model):
 
         #remove this
         index+=1
-        x = getattr(tf.keras.layers, type(pretrained_model.layers[3].layers[index]).__name__)(
-                                        filters=pretrained_model.layers[3].layers[index].filters, 
-                                        kernel_size=pretrained_model.layers[3].layers[index].kernel_size, 
-                                        strides=pretrained_model.layers[3].layers[index].strides,
-                                        kernel_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].kernel.numpy()),
-                                        bias_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].bias.numpy()),
-                                        padding=pretrained_model.layers[3].layers[index].padding,
+        x = getattr(tf.keras.layers, type(pretrained_model.layers[self.index_model].layers[index]).__name__)(
+                                        filters=pretrained_model.layers[self.index_model].layers[index].filters, 
+                                        kernel_size=pretrained_model.layers[self.index_model].layers[index].kernel_size, 
+                                        strides=pretrained_model.layers[self.index_model].layers[index].strides,
+                                        kernel_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].kernel.numpy()),
+                                        bias_initializer=tf.constant_initializer(pretrained_model.layers[self.index_model].layers[index].bias.numpy()),
+                                        padding=pretrained_model.layers[self.index_model].layers[index].padding,
                                         trainable=False)(x)
-        
-        if(feature_selection):
-            #try smoothing feature selection
-            z = getattr(tf.keras.layers, type(pretrained_model.layers[3].layers[index-1]).__name__)(pretrained_model.layers[3].layers[index-1].target_shape[:-1])(z)
-            z = DCT3D(*pretrained_model.layers[3].layers[index-1].target_shape[:-1])(z)
-            shape_smoothing=(5,5,3)
-            z = z*tf.keras.layers.ZeroPadding3D(padding=((0, z.shape[1]-shape_smoothing[0]), (0, z.shape[2]-shape_smoothing[1]), (0, z.shape[3]-shape_smoothing[2])))(tf.ones((1,)+shape_smoothing+(1,)))[:,:,:,:,0]
-            z = iDCT3D(*pretrained_model.layers[3].layers[index-1].target_shape[:-1])(z)
-            z = getattr(tf.keras.layers, type(pretrained_model.layers[3].layers[index-1]).__name__)(pretrained_model.layers[3].layers[index-1].target_shape)(z)
-        if(segmentation_mask):
-            #perform brain segmentation with mask
-            z = MRICircleMask([x,z][int(feature_selection)].shape)([x,z][int(feature_selection)])#mask a circle
 
-        if(feature_selection or segmentation_mask):
-            self.decoder = tf.keras.Model(input_shape, z)
-            #deprecated
-            sigma_2 = tf.keras.layers.Flatten()(x)
-            sigma_2 = tf.keras.layers.Dense(1, activation=tf.keras.activations.exponential)(sigma_2)
-            self.sigma_2 = tf.keras.Model(input_shape, sigma_2)
-
-        if(self.aleatoric):#we want the uncertainty from the pretrained model
-            index+=1
-            sigma_1 = getattr(tf.keras.layers, type(pretrained_model.layers[3].layers[index]).__name__)(
-                                            pretrained_model.layers[3].layers[index].units,
-                                            activation=tf.keras.activations.exponential,
-                                            kernel_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].kernel.numpy()),
-                                            bias_initializer=tf.constant_initializer(pretrained_model.layers[3].layers[index].bias.numpy()),
-                                            kernel_regularizer=regularizer,
-                                            bias_regularizer=regularizer,
-                                            trainable=False,)(x)
-            self.sigma_1 = tf.keras.Model(input_shape, sigma_1)
-
-        self.q_decoder = tf.keras.Model(input_shape, x)
-        
+        self.q_decoder = tf.keras.Model(input_shape, x)        
 
     def build(self, input_shape):
         self.eeg_encoder.build(input_shape=input_shape)
         self.q_decoder.build(input_shape=input_shape)
-        if(self.feature_selection or self.segmentation_mask):
-            self.decoder.build(input_shape=input_shape)
         self.built=True
 
-    #@tf.function(input_signature=[tf.TensorSpec([None,64,134,10,1], tf.float32), tf.TensorSpec([None,64,64,30,1], tf.float32)])
-    def call(self, x1):
+    def call(self, x1, **kwargs):
         """
             Random behaviour of GPU with tf functions does not reproduce the same results
             Call this function when getting results
         """
         
-        if(self.aleatoric):
-            sigma_1=self.sigma_1(x1)
-            #self.add_loss(tf.reduce_mean(sigma_1))#minimize the uncertainty
-            z=[tf.concat([self.q_decoder(x1),sigma_1],axis=-1)]
-        else:
-            z = [self.q_decoder(x1)]
+        z = [self.q_decoder(x1)]
 
         if(self.latent_contrastive):
             z+=[self.eeg_encoder(x1)]
 
-        if(self.feature_selection or self.segmentation_mask):
-            sigma_2 = self.sigma_2(x1)#weight of tasks
-            z_mask=1.-self.decoder(x1)
-            return z+[z_mask, sigma_1, sigma_2]
-        
         return z

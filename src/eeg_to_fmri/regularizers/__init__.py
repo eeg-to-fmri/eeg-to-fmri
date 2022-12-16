@@ -1,1 +1,2 @@
 import eeg_to_fmri.regularizers.activity_regularizers
+import eeg_to_fmri.regularizers.path_sgd

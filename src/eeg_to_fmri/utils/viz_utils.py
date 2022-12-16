@@ -586,7 +586,6 @@ def plot_3D_representation_projected_slices(instance, factor=3, h_resolution=1, 
     return fig
 
 
-
 def plot_3D_representation_projected_slices_alpha(instance, factor=3, h_resolution=1, v_resolution=1, threshold=0.37, cmap=plt.cm.nipy_spectral, cmap_background=plt.cm.binary, uncertainty=False, res_img=None, alpha_img=None, legend_colorbar="redidues", max_min_legend=["Good","Bad"], normalize_residues=False, slice_label=True, save=False, save_path=None, save_format="pdf"):
     """
         
@@ -710,7 +709,6 @@ def plot_3D_representation_projected_slices_alpha(instance, factor=3, h_resoluti
         fig.savefig(save_path, format=save_format)
 
     return fig
-
 
 
 

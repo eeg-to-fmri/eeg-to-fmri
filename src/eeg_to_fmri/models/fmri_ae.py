@@ -3,6 +3,8 @@ import tensorflow_probability as tfp
 
 from eeg_to_fmri.layers.resnet_block import ResBlock
 
+na_specification_fmri=([(14, 6, 12), (6, 4, 6), (12, 47, 5)], [(2, 1, 1), (1, 1, 1), (1, 1, 1)], True, (2, 2, 2), (1, 1, 1))
+
 search_space = [{'name': 'learning_rate', 'type': 'continuous',
                     'domain': (1e-5, 1e-2)},
                     {'name': 'reg', 'type': 'continuous',
@@ -67,10 +69,13 @@ class fMRI_AE(tf.keras.Model):
         self.in_shape = input_shape
         self._build_decoder=_build_decoder
         self.na_spec=na_spec
+
+        if(self.na_spec is None):
+            self.na_spec=na_specification_fmri
         
         self.build_encoder(latent_shape, input_shape, kernel_size, stride_size, n_channels,
                         maxpool=maxpool, batch_norm=batch_norm, weight_decay=weight_decay, skip_connections=skip_connections,
-                        n_stacks=n_stacks, local=local, local_attention=local_attention, dropout=dropout, na_spec=na_spec, seed=seed)
+                        n_stacks=n_stacks, local=local, local_attention=local_attention, dropout=dropout, na_spec=self.na_spec, seed=seed)
         if(_build_decoder):
             self.build_decoder(outfilter=outfilter, seed=seed)
     
