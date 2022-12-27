@@ -46,7 +46,7 @@ class fMRI_AE(tf.keras.Model):
     def __init__(self, latent_shape, input_shape, kernel_size, stride_size, n_channels,
                         maxpool=True, batch_norm=True, weight_decay=0.000, skip_connections=False,
                         n_stacks=2, local=True, local_attention=False, outfilter=0, dropout=False, seed=None, _build_decoder=True,
-                        na_spec=None):
+                        na_spec=None, time_length=1,):
         
         super(fMRI_AE, self).__init__()
         
@@ -54,6 +54,7 @@ class fMRI_AE(tf.keras.Model):
         self._input_shape=input_shape
         self.kernel_size=kernel_size
         self.stride_size=stride_size
+        self.time_length=time_length
         self.n_channels=n_channels
         self.maxpool=maxpool
         self.batch_norm=batch_norm
@@ -73,14 +74,14 @@ class fMRI_AE(tf.keras.Model):
         if(self.na_spec is None):
             self.na_spec=na_specification_fmri
         
-        self.build_encoder(latent_shape, input_shape, kernel_size, stride_size, n_channels,
+        self.build_encoder(latent_shape, input_shape, kernel_size, stride_size, n_channels, time_length=time_length,
                         maxpool=maxpool, batch_norm=batch_norm, weight_decay=weight_decay, skip_connections=skip_connections,
                         n_stacks=n_stacks, local=local, local_attention=local_attention, dropout=dropout, na_spec=self.na_spec, seed=seed)
         if(_build_decoder):
             self.build_decoder(outfilter=outfilter, seed=seed)
     
     def build_encoder(self, latent_shape, input_shape, kernel_size, stride_size, n_channels,
-                        maxpool=True, batch_norm=True, weight_decay=0.000, skip_connections=False,
+                        maxpool=True, batch_norm=True, weight_decay=0.000, skip_connections=False, time_length=1,
                         n_stacks=2, local=True, local_attention=False, dropout=False, na_spec=None, seed=None):
 
         input_shape = tf.keras.layers.Input(shape=input_shape)
@@ -165,6 +166,7 @@ class fMRI_AE(tf.keras.Model):
                 "stride_size": self.stride_size,
                 "n_channels": self.n_channels,
                 "maxpool": self.maxpool,
+                "time_length": self.time_length,
                 "batch_norm": self.batch_norm,
                 "weight_decay": self.weight_decay,
                 "skip_connections": self.skip_connections,

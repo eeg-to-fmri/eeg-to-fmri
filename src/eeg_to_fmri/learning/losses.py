@@ -67,8 +67,7 @@ class ContrastiveLoss(tf.keras.losses.Loss):
         if(tf.rank(distance)==2):
             similar=tf.expand_dims(similar, axis=-1)
 
-        return tf.math.log(similar*distance + (1-similar)*(tf.abs(distance-self.m)))#go to minus infinity
-        return similar*(-1.*distance) + (1-similar)*(1.*distance)
+        return similar*(distance) + (1-similar)*(tf.abs(distance-self.m))
 
 
 class ContrastiveClassificationLoss(tf.keras.losses.Loss):
@@ -94,7 +93,6 @@ class ContrastiveClassificationLoss(tf.keras.losses.Loss):
             y1_pred, y1_var = (y_pred[2], 1.)
             y2_pred, y2_var = (y_pred[3], 1.)
 
-        #return self.contrastive(y_contrast, y_pred[1])+0.*(1/y1_var)*self.nll(tf.expand_dims(y_clf1[:,1],-1), y1_pred)+0.*(1/y2_var)*self.nll(tf.expand_dims(y_clf2[:,1],-1), y2_pred) + tf.math.log(y1_var*y2_var)
         return tf.reduce_mean(self.contrastive(y_contrast, y_pred[1]),axis=1)+(1/y1_var)*self.nll(tf.expand_dims(y_clf1[:,1],-1), y1_pred)+(1/y2_var)*self.nll(tf.expand_dims(y_clf2[:,1],-1), y2_pred) + tf.math.log(y1_var*y2_var)
 
 ######################################################################################################################

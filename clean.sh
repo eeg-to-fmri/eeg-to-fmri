@@ -1,5 +1,6 @@
 
-
+rm -r dist
+rm -r src/eeg_to_fmri.egg-info
 rm -r src/eeg_to_fmri/__pycache__/
 rm -r src/eeg_to_fmri/regularizers/__pycache__/
 rm -r src/eeg_to_fmri/utils/__pycache__/

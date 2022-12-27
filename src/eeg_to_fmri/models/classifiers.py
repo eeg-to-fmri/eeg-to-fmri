@@ -4,7 +4,7 @@ import numpy as np
 
 import tensorflow_probability as tfp
 
-from eeg_to_fmri.models.synthesizers import pretrained_EEG_to_fMRI
+from eeg_to_fmri.models.synthesizers import pretrained_EEG_to_fMRI, custom_objects
 
 from eeg_to_fmri.layers.bayesian import DenseVariational
 
@@ -133,7 +133,7 @@ class ViewLatentContrastiveClassifier(tf.keras.Model):
             assert self.regularizer in ["L1", "L2"]
             regularizer=getattr(tf.keras.regularizers, self.regularizer)(l=self.regularizer_const)
 
-        self.view=pretrained_EEG_to_fMRI(tf.keras.models.load_model(path_network, custom_objects=eeg_to_fmri.custom_objects, compile=False), self._input_shape, activation=activation, latent_contrastive=True, organize_channels=organize_channels, seed=seed)
+        self.view=pretrained_EEG_to_fMRI(tf.keras.models.load_model(path_network, custom_objects=custom_objects, compile=False), self._input_shape, activation=activation, latent_contrastive=True, organize_channels=organize_channels, seed=seed)
         
         if(degree==1):
             self.clf = LinearClassifier(variational=self.variational, regularizer=regularizer, aleatoric=self.aleatoric)
@@ -159,15 +159,10 @@ class ViewLatentContrastiveClassifier(tf.keras.Model):
             z1 = self.view(x1, training=self.training)#returns a list of [fmri view, latent_eeg]
             z2 = self.view(x2, training=self.training)
 
-            s1=self.flatten(z1[1])-np.pi/2
-            s2=self.flatten(z2[1])-np.pi/2
-
-            #normalize before dot, without gradient propagation in division
-            s1=s1/tf.norm(s1.numpy(), ord=2)
-            s2=s2/tf.norm(s2.numpy(), ord=2)
+            s1=self.flatten(z1[1])
+            s2=self.flatten(z2[1])
 
             return [(z1[0],z2[0]), tf.abs(s1-s2), self.clf(z1[0].numpy(), training=self.training), self.clf(z2[0].numpy(), training=self.training)]
-            return [(z1[0],z2[0]), self.dot([s1,s2]), self.clf(z1[0].numpy(), training=self.training), self.clf(z2[0].numpy(), training=self.training)]
 
         #also when training only for classification
         return self.clf(self.view(X, training=self.training)[0], training=self.training)

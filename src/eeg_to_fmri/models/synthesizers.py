@@ -103,7 +103,7 @@ class EEG_to_fMRI(tf.keras.Model):
                 weight_decay=0.000, skip_connections=False, batch_norm=True,
                 dropout=False, local=True, fourier_features=False, 
                 conditional_attention_style=False, random_fourier=False,
-                conditional_attention_style_prior=False,
+                conditional_attention_style_prior=False, time_length=1, batch_norm_reg=False,
                 inverse_DFT=False, DFT=False, aleatoric_uncertainty=False,
                 variational_iDFT=False, variational_coefs=None, variational_dist=None,
                 variational_iDFT_dependent=False, variational_iDFT_dependent_dim=1,
@@ -121,6 +121,7 @@ class EEG_to_fMRI(tf.keras.Model):
         self.weight_decay=weight_decay
         self.skip_connections=skip_connections
         self.batch_norm=batch_norm
+        self.batch_norm_reg=batch_norm_reg
         self.dropout=dropout
         self.local=local
         self.fourier_features=fourier_features
@@ -155,14 +156,15 @@ class EEG_to_fMRI(tf.keras.Model):
         input_shape, x, attention_scores = self.build_encoder(latent_shape, input_shape, self.na_spec, n_channels, 
                             dropout=dropout, weight_decay=weight_decay, 
                             skip_connections=skip_connections, local=local, 
-                            batch_norm=batch_norm, 
+                            batch_norm=batch_norm, time_length=time_length,
                             topographical_attention=topographical_attention,
                             organize_channels=organize_channels,
                             seed=seed)
         self.build_decoder(input_shape, x, latent_shape, inverse_DFT=inverse_DFT, DFT=DFT,
-                            attention_scores=attention_scores, 
+                            attention_scores=attention_scores, time_length=time_length,
                             conditional_attention_style=conditional_attention_style,
                             conditional_attention_style_prior=conditional_attention_style_prior,
+                            batch_norm_reg=batch_norm_reg,
                             random_fourier=random_fourier,
                             fourier_features=fourier_features,
                             resolution_decoder=resolution_decoder,
@@ -177,7 +179,7 @@ class EEG_to_fMRI(tf.keras.Model):
                             outfilter=self.fmri_ae.outfilter, weight_decay=weight_decay, seed=seed)
 
     def build_encoder(self, latent_shape, input_shape, na_spec, n_channels, 
-                            dropout=False, weight_decay=0.000, 
+                            dropout=False, weight_decay=0.000, time_length=1,
                             skip_connections=False, batch_norm=True, 
                             local=True, topographical_attention=False,
                             organize_channels=False, seed=None):
@@ -219,8 +221,8 @@ class EEG_to_fMRI(tf.keras.Model):
 
     def build_decoder(self, input_shape, output_encoder, latent_shape, fourier_features=False, random_fourier=False, 
                             attention_scores=None, conditional_attention_style=False, conditional_attention_style_prior=False,
-                            inverse_DFT=False, DFT=False, fourier_normalization="layer",
-                            low_resolution_decoder=False, resolution_decoder=None, 
+                            inverse_DFT=False, DFT=False, fourier_normalization="layer", batch_norm_reg=False,
+                            low_resolution_decoder=False, resolution_decoder=None, time_length=1,
                             variational_iDFT=False, variational_coefs=None, variational_dist=None,
                             variational_iDFT_dependent=False, variational_iDFT_dependent_dim=1,
                             variational_random_padding=False,
@@ -230,7 +232,7 @@ class EEG_to_fMRI(tf.keras.Model):
 
         if(fourier_features):
             if(random_fourier):
-                x = RandomFourierFeatures(latent_shape[0]*latent_shape[1]*latent_shape[2],
+                x = RandomFourierFeatures(latent_shape[0]*latent_shape[1]*latent_shape[2], batch_norm_reg=batch_norm_reg,
                                                                 normalization=fourier_normalization, trainable=True, seed=seed, name="random_fourier_features")(x)
             else:
                 x = FourierFeatures(latent_shape[0]*latent_shape[1]*latent_shape[2], 
@@ -354,8 +356,10 @@ class EEG_to_fMRI(tf.keras.Model):
                 "weight_decay": self.weight_decay,
                 "skip_connections": self.skip_connections,
                 "batch_norm": self.batch_norm,
+                "batch_norm_reg": self.batch_norm_reg,
                 "dropout": self.dropout,
                 "local": self.local,
+                "time_length": self.time_length,
                 "fourier_features": self.fourier_features,
                 "fourier_normalization": self.fourier_normalization,
                 "conditional_attention_style": self.conditional_attention_style,
@@ -490,6 +494,7 @@ class pretrained_EEG_to_fMRI(tf.keras.Model):
                                             pretrained_model.layers[self.index_model].layers[index].units,
                                             normalization=pretrained_model.layers[self.index_model].layers[index].normalization,
                                             scale=pretrained_model.layers[self.index_model].layers[index].kernel_scale.numpy(),
+                                            batch_norm_reg=pretrained_model.layers[self.index_model].layers[index].batch_norm_reg,
                                             trainable=False, name="latent_projection")(x)
         else:
             x = globals()[type(pretrained_model.layers[self.index_model].layers[index]).__name__](

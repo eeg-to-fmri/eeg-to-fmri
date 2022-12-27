@@ -84,7 +84,7 @@ class TanhNormalization(tf.keras.layers.Layer):
 
 class RandomFourierFeatures(tf.keras.layers.Layer):
 
-	def __init__(self, output_dim, kernel_initializer='gaussian', scale=None, normalization="layer", trainable=False, units=None, seed=None, name=None, **kwargs):
+	def __init__(self, output_dim, kernel_initializer='gaussian', scale=None, normalization="layer", batch_norm_reg=False, trainable=False, units=None, seed=None, name=None, **kwargs):
 		if output_dim <= 0:
 			raise ValueError(
 			'`output_dim` should be a positive integer. Given: {}.'.format(
@@ -101,13 +101,17 @@ class RandomFourierFeatures(tf.keras.layers.Layer):
 		self.output_dim = output_dim
 		self.units=output_dim
 		self.normalization=normalization
+		self.batch_norm_reg=batch_norm_reg
 		self.kernel_initializer = kernel_initializer
+		
 		if(normalization=="layer"):
 			self.layer_normalization=tf.keras.layers.LayerNormalization(beta_initializer=tf.constant_initializer(np.pi/2), gamma_initializer=tf.constant_initializer(np.pi/2), trainable=False)
-			self.reg_normalization=MaxNormalization(mu=np.pi/2, l=0.5*(2/np.pi)**0.5, p=2)
 		elif(normalization=="tanh"):
 			self.layer_normalization=TanhNormalization()
+		
+		if(self.batch_norm_reg):
 			self.reg_normalization=MaxNormalization(mu=np.pi/2, l=0.5*(2/np.pi)**0.5, p=2)
+
 		self.scale = scale
 		self.seed=seed
 		self.trainable=trainable
@@ -155,7 +159,8 @@ class RandomFourierFeatures(tf.keras.layers.Layer):
 		
 		outputs=self.layer_normalization(outputs)
 
-		outputs=self.reg_normalization(outputs)
+		if(self.batch_norm_reg):
+			outputs=self.reg_normalization(outputs)
 		
 		return outputs
 
@@ -178,6 +183,7 @@ class RandomFourierFeatures(tf.keras.layers.Layer):
 			'scale': self.scale,
 			'units': self.units,
 			'normalization': self.normalization,
+			'batch_norm_reg': self.batch_norm_reg,
 		}
 		base_config = super(RandomFourierFeatures, self).get_config()
 		return dict(list(base_config.items()) + list(config.items()))
