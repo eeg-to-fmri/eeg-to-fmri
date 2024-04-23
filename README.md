@@ -7,28 +7,11 @@
 
 ## Setup
 
-Ideally, your machine has a GPU and is running Linux.
-
-First of all, please install [anaconda](https://www.anaconda.com/) at ```$HOME/anaconda3/```. To setup the environment for this repository, please run the following commands:
+Ideally, your machine has a GPU and is running Linux. Please install the package via PyPI:
 
 ```shell
-git clone git@github.com:DCalhas/eeg_to_fmri.git
-cd eeg_to_fmri
+pip install eeg-to-fmri
 ```
-
-Download [cudnn](https://developer.nvidia.com/cudnn):
-
-```shell
-wget https://developer.download.nvidia.com/compute/redist/cudnn/v8.0.1/cudnn-11.0-linux-x64-v8.0.1.13.tgz
-```
-
-Run the configuration file:
-
-```shell
-./config.sh
-```
-
-Please make sure to set the path to the datasets directory correclty. This path is stored in an environment variable, so every time you activate the environment, the variable is set and used in the code as os.environ['EEG_FMRI_DATASETS'].
 
 ## How do I test this research on my dataset?
 
@@ -237,18 +220,6 @@ Import the modules to perform the DCT and either add or remove resolutions to fi
 ```
 
 After this, you should be set to run the code and retrieve the results you desire.
-
-### Run the code and retrieve results
-
-Now you just need to run the [main.py](https://github.com/DCalhas/eeg_to_fmri/blob/master/src/main.py) file with your dataset identifier given as an argument. Please refer to the [documentation](https://github.com/DCalhas/eeg_to_fmri/blob/master/DOCUMENTATION.md), where you will find what you need to give as arguments, an example call is (open shell):
-
-```shell
-cd eeg_to_fmri/src
-conda activate eeg_fmri
-mkdir /tmp/eeg_to_fmri
-mkdir /tmp/eeg_to_fmri/metrics
-python main.py metrics NEW -na_path_eeg ../na_models_eeg/na_specification_2 -na_path_fmri ../na_models_fmri/na_specification_2 -save_metrics -metrics_path /tmp/eeg_to_fmri/metrics
-```
 
 ## Blog posts
 
